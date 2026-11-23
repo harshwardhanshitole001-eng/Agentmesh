@@ -1,11 +1,11 @@
-# AgentMesh
+ # AgentMesh
 
 Discovery playground and cross-site orchestrator for the open agentic web.
 Paste any site URL: AgentMesh finds its `.network.json`, scores it, draws its tools on a live graph and lets a model chain tools across sites.
 
 Full stack, **zero npm dependencies** (Node 18+).
 
-## Run
+  ## Run
 
 ```bash
 npm start
@@ -13,7 +13,7 @@ npm start
 
 Then open <http://localhost:3000>.
 
-## What each part does
+ ## What each part does
 
 | Part | File | Role |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Then open <http://localhost:3000>.
 | Browser runtime | `public/index.html` | Scanner, D3 graph, tool inspector, BYOK panel, agent loop, `postMessage` bridge |
 | Backend | `server.js` | CORS relay scanner, SSRF-guarded tool relay, manifest validator, public registry, rate limit |
 
-## API
+ ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -33,11 +33,11 @@ Then open <http://localhost:3000>.
 | POST | `/api/tools/{scan_url,validate_manifest,list_agents}` | AgentMesh's own tools, callable by other agents |
 | GET | `/api/health` | Status |
 
-## Bring your own key
+ ## Bring your own key
 
 Open the model panel and choose OpenAI, OpenRouter, or Mozilla Otari (paste your router's OpenAI-compatible base URL). Keys stay in the browser and go only to the endpoint you set.
 
-## Deploy
+ ## Deploy
 
 - **Render / Railway / Fly**: connect the repo, start command `node server.js`.
 - **Docker**: `docker build -t agentmesh . && docker run -p 3000:3000 agentmesh`.
@@ -45,10 +45,10 @@ Open the model panel and choose OpenAI, OpenRouter, or Mozilla Otari (paste your
 
 Environment: `PORT` (default 3000). `ALLOW_PRIVATE=1` disables the private-address block, for local testing only.
 
-## Make your own site discoverable
+ ## Make your own site discoverable
 
 Host a `.network.json` with `name`, `description`, `url` and `tools[]` (each with `description`, `inputSchema`, `endpoint`), and send `Access-Control-Allow-Origin: *`.
 
-## License
+ ## License
 
 MIT

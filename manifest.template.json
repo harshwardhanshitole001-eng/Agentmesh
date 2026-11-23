@@ -1,0 +1,19 @@
+{
+  "schema": "network.json/v1",
+  "id": "agentmesh",
+  "name": "AgentMesh",
+  "version": "1.0.0",
+  "description": "Discovery hub and orchestrator for the open agentic web. Scans sites, scores their manifests, maps their tools and routes tasks across them.",
+  "url": "__ORIGIN__/",
+  "entry": "__ORIGIN__/",
+  "runtime": { "type": "browser+server", "transport": ["https", "postMessage"], "cors": "Access-Control-Allow-Origin: *" },
+  "tools": [
+    { "name": "scan_url", "description": "Find and return the .network.json manifest of any public website.", "tags": ["discovery", "manifest"], "endpoint": "__ORIGIN__/api/tools/scan_url",
+      "inputSchema": { "type": "object", "properties": { "url": { "type": "string", "description": "Site URL" } }, "required": ["url"] } },
+    { "name": "validate_manifest", "description": "Fetch a site's manifest and score its quality from 0 to 100 with a list of issues.", "tags": ["discovery", "quality"], "endpoint": "__ORIGIN__/api/tools/validate_manifest",
+      "inputSchema": { "type": "object", "properties": { "url": { "type": "string" } }, "required": ["url"] } },
+    { "name": "list_agents", "description": "List agents in the public AgentMesh registry.", "tags": ["discovery", "registry"], "endpoint": "__ORIGIN__/api/tools/list_agents",
+      "inputSchema": { "type": "object", "properties": {} } }
+  ],
+  "messaging": { "request": { "type": "agentmesh.call", "fields": ["id", "tool", "arguments"] }, "discover": { "type": "agentmesh.discover" } }
+}

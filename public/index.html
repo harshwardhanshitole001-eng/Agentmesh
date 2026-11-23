@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AgentMesh – Open Agentic Web Discovery Playground</title>
+<meta name="description" content="Paste any site URL. AgentMesh fetches its .network.json, maps its tools on a live graph and orchestrates tasks across sites, entirely in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{--bg:#0a0d1c;--panel:#111631cc;--line:#262d57;--tx:#e8ebff;--mu:#8e97c9;--a:#7c6cff;--b:#27d3ee;--c:#ffb454;--ok:#3ddc97;--er:#ff6b81}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font:15px/1.5 "Space Grotesk",system-ui,sans-serif;color:var(--tx);background:radial-gradient(900px 500px at 10% -10%,#2a1f6e55,transparent),radial-gradient(800px 500px at 100% 0,#0b5a7455,transparent),var(--bg);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:18px 24px 6px}
+h1{margin:0;font-size:26px;letter-spacing:-.5px}h1 span{color:var(--b)}
+header p{margin:0;color:var(--mu);flex:1;min-width:240px}
+main{display:grid;grid-template-columns:340px minmax(0,1fr) 380px;gap:14px;padding:14px 24px 24px;min-height:calc(100% - 80px)}
+@media(max-width:1180px){main{grid-template-columns:1fr 1fr}.graph{grid-column:1/-1;order:-1}}
+@media(max-width:760px){main{grid-template-columns:1fr;padding:12px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;backdrop-filter:blur(10px);min-width:0}
+.col{display:flex;flex-direction:column;gap:14px}
+h2{margin:0 0 10px;font-size:15px;color:var(--mu);font-weight:500}
+input,select,textarea,button{font:inherit;color:var(--tx)}
+input,select,textarea{width:100%;background:#0a0e24;border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
+textarea{resize:vertical;font:13px ui-monospace,Menlo,monospace}
+:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+button{cursor:pointer;border:1px solid var(--line);background:#1a2150;border-radius:9px;padding:9px 14px}
+button:hover{border-color:var(--a)}
+button.pri{background:linear-gradient(135deg,var(--a),#4f8cff);border:0;font-weight:700}
+.row{display:flex;gap:8px}.row>*{flex:1}.row .fit{flex:none}
+.agent{display:flex;gap:10px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;cursor:pointer}
+.agent.on{border-color:var(--b);background:#122049}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.agent b{display:block;line-height:1.2}.agent small{color:var(--mu)}
+.x{margin-left:auto;background:none;border:0;color:var(--mu);padding:2px 6px}
+.graph{display:flex;flex-direction:column;min-height:520px}
+#svgwrap{flex:1;min-height:440px;position:relative;border-radius:10px;background:repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 32px),repeating-linear-gradient(90deg,#ffffff06 0 1px,transparent 1px 32px)}
+svg{width:100%;height:100%;position:absolute;inset:0}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--mu);padding:30px}
+.legend{display:flex;gap:14px;color:var(--mu);font-size:13px;margin-top:8px;flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.node text{fill:var(--tx);font-size:11px;pointer-events:none}
+.node.pulse circle{animation:p 1s ease-out 2}
+@keyframes p{0%{stroke-width:0;stroke:var(--c)}50%{stroke-width:14;stroke:var(--c)}100%{stroke-width:0}}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,Menlo,monospace;background:#0a0e24;border:1px solid var(--line);border-radius:9px;padding:9px;max-height:200px;overflow:auto}
+#trace{max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.t{padding:8px 10px;border-left:3px solid var(--a);background:#0a0e24;border-radius:6px;font-size:13px;word-break:break-word}
+.t.ok{border-color:var(--ok)}.t.er{border-color:var(--er)}.t.call{border-color:var(--c)}.t.ai{border-color:var(--b)}
+.chip{display:inline-block;padding:1px 8px;border:1px solid var(--line);border-radius:99px;font-size:12px;color:var(--mu);margin:2px 3px 2px 0}
+.muted{color:var(--mu);font-size:13px}
+details summary{cursor:pointer;color:var(--mu);margin-bottom:8px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent<span>Mesh</span></h1>
+  <p>Paste a site’s address. AgentMesh finds its <code>.network.json</code>, draws its tools and lets agents on different sites work together, all inside your browser.</p>
+  <button id="selfExport" title="Download this site’s manifest files">Export our manifest</button>
+</header>
+
+<main>
+<div class="col">
+  <section class="card">
+    <h2>Scan a website</h2>
+    <div class="row"><input id="url" placeholder="https://your-project.example" autocomplete="off" aria-label="Website URL"><button class="pri fit" id="scan">Scan</button></div>
+    <div class="row"><button id="demo">Load demo mesh</button><button id="reg">Community registry</button><button id="pasteBtn">Paste JSON</button></div>
+    <details id="paste" style="margin-top:10px"><summary>Manifest blocked by CORS? Paste it here</summary>
+      <textarea id="pj" rows="6" placeholder='{"name":"My agent","tools":[…]}'></textarea><button id="pjGo">Add this manifest</button></details>
+  </section>
+  <section class="card"><h2>Discovered agents <span id="count" class="chip">0</span></h2><div id="list"><p class="muted">Nothing scanned yet. Scan a URL or load the demo mesh to begin.</p></div></section>
+  <section class="card">
+    <h2>Your model (bring your own key)</h2>
+    <select id="prov"><option value="https://api.openai.com/v1|gpt-4o-mini">OpenAI</option><option value="https://openrouter.ai/api/v1|openai/gpt-4o-mini">OpenRouter</option><option value="|">Mozilla Otari (paste router URL)</option><option value="custom|">Other OpenAI‑compatible</option></select>
+    <input id="base" placeholder="Base URL, e.g. https://api.openai.com/v1" aria-label="Base URL">
+    <input id="model" placeholder="Model name" aria-label="Model">
+    <input id="key" type="password" placeholder="API key or Otari credits token" autocomplete="off" aria-label="API key">
+    <label class="muted"><input type="checkbox" id="rem" style="width:auto;margin:0 6px 0 0">Remember for this tab only</label>
+    <p class="muted" style="margin:8px 0 0">Keys never leave your browser except to the endpoint above.</p>
+  </section>
+</div>
+
+<section class="card graph">
+  <h2>Live capability graph</h2>
+  <div id="svgwrap"><svg id="svg" role="img" aria-label="Agent capability graph"></svg><div class="empty" id="empty">The graph appears here. Each agent links to its tools, and each tool to the inputs it accepts.</div></div>
+  <div class="legend"><span><i style="background:var(--a)"></i>Agent</span><span><i style="background:var(--b)"></i>Tool</span><span><i style="background:var(--c)"></i>Input</span><span>Dashed lines: shared capability across sites</span></div>
+</section>
+
+<div class="col">
+  <section class="card"><h2>Inspector</h2><div id="insp"><p class="muted">Select a tool in the graph to read its schema and run it directly.</p></div></section>
+  <section class="card">
+    <h2>Cross-site task</h2>
+    <textarea id="task" rows="3" placeholder="e.g. Plan a 2‑day AI meetup in Pune for 80 people and book tickets for 3 friends."></textarea>
+    <button class="pri" id="run" style="width:100%">Run across all agents</button>
+    <div id="trace" style="margin-top:10px"></div>
+  </section>
+</div>
+</main>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const PAL=["#7c6cff","#ff7ac6","#3ddc97","#ffb454","#4f8cff","#ff6b81"];
+let agents=[], selTool=null;
+const API=(new URLSearchParams(location.search).get("api")||"").replace(/\/$/,""); // empty = same origin as the Node backend
+const post=(u,b)=>fetch(API+u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
+
+/* ---------- trace ---------- */
+function trace(msg,cls=""){const d=document.createElement("div");d.className="t "+cls;d.textContent=msg;$("#trace").append(d);d.scrollIntoView({block:"nearest"});}
+
+/* ---------- manifest normalisation (tolerant of schema variants) ---------- */
+function normalise(m,base,local){
+  let raw=m.tools||m.capabilities||m.skills||m.actions||[];
+  if(raw&&!Array.isArray(raw))raw=Object.entries(raw).map(([k,v])=>({name:k,...(typeof v==="object"?v:{description:String(v)})}));
+  const id=(m.id||m.name||base).toString().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24)||"agent";
+  return{id,name:m.name||id,description:m.description||"",base,local:!!local,endpoint:m.endpoint||m.entry||m.api||null,
+    tools:raw.map(t=>typeof t==="string"?{name:t,schema:{type:"object",properties:{}},tags:[]}:{
+      name:String(t.name||t.id||"tool"),description:t.description||"",tags:t.tags||[],endpoint:t.endpoint||t.url||null,fn:t.fn,
+      schema:t.inputSchema||t.input_schema||t.parameters||t.input||{type:"object",properties:{}}}),
+    color:PAL[agents.length%PAL.length],raw:m};
+}
+function addAgent(m,base,local){
+  const a=normalise(m,base,local);
+  const i=agents.findIndex(x=>x.base===base); if(i>=0){a.color=agents[i].color;agents[i]=a}else agents.push(a);
+  render();return a;
+}
+
+/* ---------- discovery ---------- */
+const PATHS=["/.network.json","/.well-known/network.json","/agent-manifest.json","/.well-known/agent-manifest.json","/network.json"];
+async function scan(input){
+  let u=input.trim(); if(!u)return trace("Enter a URL to scan.","er");
+  if(!/^https?:\/\//i.test(u))u="https://"+u;
+  let url; try{url=new URL(u)}catch{return trace("That doesn’t look like a valid URL.","er")}
+  const dir=url.href.replace(/[^/]*$/,"");
+  const cands=url.pathname.endsWith(".json")?[url.href]:[...PATHS.map(p=>url.origin+p),...PATHS.map(p=>dir+p.slice(1))];
+  trace("Scanning "+url.origin+" …");
+  for(const c of [...new Set(cands)]){
+    try{
+      const r=await fetch(c,{headers:{Accept:"application/json"}}); if(!r.ok)continue;
+      const j=await r.json(); const a=addAgent(j,url.origin);
+      trace(`Found manifest at ${c} → ${a.name} (${a.tools.length} tools)`,"ok"); post("/api/registry",{url:url.origin}).catch(()=>{}); return;
+    }catch(e){}
+  }
+  try{const r=await fetch(API+"/api/scan?url="+encodeURIComponent(url.href));
+    if(r.ok){const j=await r.json();const a=addAgent(j.manifest,j.origin);trace(`Found via AgentMesh server relay: ${j.source} → ${a.name} (${a.tools.length} tools)`,"ok");post("/api/registry",{url:j.origin}).catch(()=>{});return}
+    const er=await r.json().catch(()=>({}));if(er.error)trace("Server relay: "+er.error,"er")}catch{}
+  trace("No readable manifest found. Either none exists at the usual paths, or the site blocks cross-origin reads (needs Access-Control-Allow-Origin: *). You can paste the JSON manually.","er");
+  $("#paste").open=true;
+}
+
+/* ---------- built-in demo agents (run locally, no network) ---------- */
+const DEMO=[
+ {name:"EventPlanner",description:"Plans events, venues and agendas.",tools:[
+  {name:"find_venues",description:"Find venues in a city for a given head count.",tags:["event","venue"],inputSchema:{type:"object",properties:{city:{type:"string"},guests:{type:"integer"}},required:["city","guests"]},
+   fn:a=>({venues:[{name:a.city+" Tech Hub",capacity:a.guests+40},{name:"Riverside Hall",capacity:a.guests+120}]})},
+  {name:"plan_agenda",description:"Create a day-by-day agenda for an event theme.",tags:["event","schedule"],inputSchema:{type:"object",properties:{theme:{type:"string"},days:{type:"integer"}},required:["theme","days"]},
+   fn:a=>({agenda:Array.from({length:a.days||1},(_,i)=>({day:i+1,sessions:["Keynote: "+a.theme,"Workshops","Open demos"]}))})}]},
+ {name:"TicketDesk",description:"Ticket availability and booking.",tools:[
+  {name:"check_availability",description:"Check how many tickets remain for an event.",tags:["tickets","event"],inputSchema:{type:"object",properties:{event:{type:"string"}},required:["event"]},fn:a=>({event:a.event,remaining:112})},
+  {name:"book_tickets",description:"Book tickets for named attendees.",tags:["tickets"],inputSchema:{type:"object",properties:{event:{type:"string"},attendees:{type:"array",items:{type:"string"}}},required:["event","attendees"]},
+   fn:a=>({confirmation:"AM-"+Math.random().toString(36).slice(2,8).toUpperCase(),event:a.event,count:(a.attendees||[]).length})}]}
+];
+function loadDemo(){DEMO.forEach(d=>addAgent(d,"local://"+d.name.toLowerCase(),true));trace("Demo mesh loaded: EventPlanner and TicketDesk run in-page. Try a cross-site task.","ok");}
+
+/* ---------- tool execution: local fn → HTTP endpoint → postMessage bridge ---------- */
+async function callTool(a,t,args){
+  pulse(a.id+"/"+t.name);
+  if(t.fn)return t.fn(args);
+  const ep=t.endpoint||a.endpoint;
+  if(ep){
+    const url=new URL(ep,a.base+"/").href;
+    const body=t.endpoint?args:{tool:t.name,arguments:args};let r;
+    try{r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})}catch(e){r=await post("/api/relay",{url,body});trace("Direct call blocked by CORS, used server relay.")}
+    const txt=await r.text(); if(!r.ok)throw new Error("HTTP "+r.status+": "+txt.slice(0,200));
+    try{return JSON.parse(txt)}catch{return txt}
+  }
+  return bridge(a,t.name,args);
+}
+function bridge(a,tool,args){
+  return new Promise((res,rej)=>{
+    const f=document.createElement("iframe"),id=crypto.randomUUID(),origin=new URL(a.base).origin;
+    f.src=a.base;f.hidden=true;f.setAttribute("sandbox","allow-scripts allow-same-origin");
+    const done=(fn,v)=>{removeEventListener("message",h);clearTimeout(to);f.remove();fn(v)};
+    const h=e=>{if(e.origin===origin&&e.data&&e.data.id===id)e.data.error?done(rej,new Error(e.data.error)):done(res,e.data.result)};
+    const to=setTimeout(()=>done(rej,new Error("postMessage bridge timed out (site must answer {type:'agentmesh.call'}).")),9000);
+    addEventListener("message",h);
+    f.onload=()=>f.contentWindow.postMessage({type:"agentmesh.call",id,tool,arguments:args},origin);
+    document.body.append(f);
+  });
+}
+
+/* ---------- LLM orchestration (OpenAI-compatible: OpenAI, OpenRouter, Mozilla Otari…) ---------- */
+const fname=(a,t)=>(a.id+"__"+t.name).replace(/[^a-zA-Z0-9_-]/g,"_").slice(0,64);
+async function orchestrate(task){
+  const base=$("#base").value.trim().replace(/\/$/,""),key=$("#key").value.trim(),model=$("#model").value.trim();
+  if(!agents.length)return trace("Add at least one agent first.","er");
+  if(!base||!key||!model)return trace("Fill in base URL, model and key in the model panel.","er");
+  const map={},tools=[];
+  agents.forEach(a=>a.tools.forEach(t=>{const n=fname(a,t);map[n]=[a,t];tools.push({type:"function",function:{name:n,description:`[${a.name}] ${t.description}`,parameters:t.schema&&t.schema.type?t.schema:{type:"object",properties:{}}}})}));
+  const msgs=[{role:"system",content:"You are AgentMesh, a coordinator. Use tools from different websites together to finish the user’s task. Chain tool results into later calls. Finish with a short summary."},{role:"user",content:task}];
+  trace("Task: "+task);
+  for(let i=0;i<8;i++){
+    const r=await fetch(base+"/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},body:JSON.stringify({model,messages:msgs,tools,tool_choice:"auto"})});
+    if(!r.ok)throw new Error("Model error "+r.status+": "+(await r.text()).slice(0,240));
+    const m=(await r.json()).choices[0].message; msgs.push(m);
+    if(!m.tool_calls||!m.tool_calls.length){trace(m.content||"(no reply)","ai");return}
+    for(const c of m.tool_calls){
+      const [a,t]=map[c.function.name]||[]; let out;
+      if(!a){out={error:"Unknown tool"}}else{
+        let args={};try{args=JSON.parse(c.function.arguments||"{}")}catch{}
+        trace(`${a.name} → ${t.name}(${JSON.stringify(args)})`,"call");
+        try{out=await callTool(a,t,args);trace("↳ "+JSON.stringify(out).slice(0,300),"ok")}catch(e){out={error:e.message};trace("↳ "+e.message,"er")}
+      }
+      msgs.push({role:"tool",tool_call_id:c.id,content:JSON.stringify(out)});
+    }
+  }
+  trace("Stopped after 8 steps.","er");
+}
+
+/* ---------- UI: registry list ---------- */
+function render(){
+  $("#count").textContent=agents.length;
+  $("#list").innerHTML=agents.length?agents.map(a=>`<div class="agent" data-id="${a.id}"><span class="dot" style="background:${a.color}"></span><div><b>${esc(a.name)}</b><small>${a.tools.length} tools · ${esc(a.local?"runs in page":a.base)}</small></div><button class="x" data-rm="${a.id}" aria-label="Remove ${esc(a.name)}">✕</button></div>`).join(""):'<p class="muted">Nothing scanned yet. Scan a URL or load the demo mesh to begin.</p>';
+  $("#list").querySelectorAll(".agent").forEach(el=>el.onclick=e=>{
+    if(e.target.dataset.rm){agents=agents.filter(a=>a.id!==e.target.dataset.rm);render();return}
+    const a=agents.find(x=>x.id===el.dataset.id);$("#insp").innerHTML=`<b>${esc(a.name)}</b><p class="muted">${esc(a.description)}</p>`+a.tools.map(t=>`<span class="chip">${esc(t.name)}</span>`).join("")+`<pre style="margin-top:8px">${esc(JSON.stringify(a.raw,(k,v)=>typeof v==="function"?undefined:v,2))}</pre><button id="val" style="margin-top:8px;width:100%">Validate manifest</button><pre id="vout" style="margin-top:8px;display:none"></pre>`;
+    $("#val").onclick=async()=>{const o=$("#vout");o.style.display="block";try{const v=await(await post("/api/validate",{manifest:JSON.parse(JSON.stringify(a.raw))})).json();o.textContent="Score "+v.score+"/100\n"+(v.issues.join("\n")||"No issues found.")}catch{o.textContent="Backend not reachable."}};
+  });
+  drawGraph();
+}
+
+/* ---------- UI: D3 graph ---------- */
+let sim;
+function drawGraph(){
+  const svg=d3.select("#svg"); svg.selectAll("*").remove(); $("#empty").style.display=agents.length?"none":"grid";
+  if(!agents.length)return;
+  const nodes=[],links=[];
+  agents.forEach(a=>{nodes.push({id:a.id,label:a.name,kind:"a",r:24,color:a.color,a});
+    a.tools.forEach(t=>{const tid=a.id+"/"+t.name;nodes.push({id:tid,label:t.name,kind:"t",r:13,color:"#27d3ee",a,t});links.push({source:a.id,target:tid});
+      Object.keys((t.schema&&t.schema.properties)||{}).forEach(p=>{const pid=tid+"."+p;nodes.push({id:pid,label:p,kind:"p",r:6,color:"#ffb454"});links.push({source:tid,target:pid})})})});
+  const tt=nodes.filter(n=>n.kind==="t");
+  tt.forEach((x,i)=>tt.slice(i+1).forEach(y=>{if(x.a!==y.a&&(x.t.tags||[]).some(g=>(y.t.tags||[]).includes(g)))links.push({source:x.id,target:y.id,cross:1})}));
+  const w=$("#svgwrap").clientWidth,h=$("#svgwrap").clientHeight, g=svg.append("g");
+  svg.call(d3.zoom().scaleExtent([.3,3]).on("zoom",e=>g.attr("transform",e.transform)));
+  const L=g.selectAll("line").data(links).join("line").attr("stroke",d=>d.cross?"#ffb454":"#3a4380").attr("stroke-dasharray",d=>d.cross?"5 4":null).attr("stroke-width",d=>d.cross?1.6:1.2);
+  const N=g.selectAll("g.node").data(nodes).join("g").attr("class","node").attr("data-id",d=>d.id).style("cursor",d=>d.kind==="t"?"pointer":"grab");
+  N.append("circle").attr("r",d=>d.r).attr("fill",d=>d.color).attr("fill-opacity",.85).attr("stroke-opacity",.5);
+  N.append("text").attr("dy",d=>d.r+12).attr("text-anchor","middle").text(d=>d.label).style("font-size",d=>d.kind==="a"?"13px":"11px").style("opacity",d=>d.kind==="p"?.6:1);
+  N.on("click",(e,d)=>{if(d.kind==="t")inspect(d.a,d.t)});
+  N.call(d3.drag().on("start",(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y}).on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y}).on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=d.fy=null}));
+  sim=d3.forceSimulation(nodes).force("link",d3.forceLink(links).id(d=>d.id).distance(d=>d.cross?160:d.target.kind==="p"?34:80).strength(d=>d.cross?.05:.8))
+    .force("charge",d3.forceManyBody().strength(-170)).force("center",d3.forceCenter(w/2,h/2)).force("col",d3.forceCollide(d=>d.r+8))
+    .on("tick",()=>{L.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);N.attr("transform",d=>`translate(${d.x},${d.y})`)});
+}
+function pulse(id){const n=document.querySelector(`.node[data-id="${CSS.escape(id)}"]`);if(n){n.classList.remove("pulse");void n.getBoundingClientRect();n.classList.add("pulse")}}
+
+/* ---------- UI: inspector with direct tool tester ---------- */
+function skeleton(s){const o={};Object.entries((s&&s.properties)||{}).forEach(([k,v])=>o[k]=v.type==="integer"||v.type==="number"?1:v.type==="array"?[]:v.type==="boolean"?false:v.type==="object"?{}:"");return o}
+function inspect(a,t){
+  selTool=[a,t];
+  $("#insp").innerHTML=`<b>${esc(t.name)}</b> <span class="chip">${esc(a.name)}</span><p class="muted">${esc(t.description||"No description provided.")}</p>
+   <details open><summary>Input schema</summary><pre>${esc(JSON.stringify(t.schema,null,2))}</pre></details>
+   <textarea id="args" rows="4" aria-label="Arguments (JSON)">${esc(JSON.stringify(skeleton(t.schema),null,2))}</textarea>
+   <button class="pri" id="tryit" style="width:100%">Run tool</button><pre id="out" style="margin-top:8px;display:none"></pre>`;
+  $("#tryit").onclick=async()=>{const o=$("#out");o.style.display="block";o.textContent="Running…";
+    try{const r=await callTool(a,t,JSON.parse($("#args").value||"{}"));o.textContent=JSON.stringify(r,null,2)}catch(e){o.textContent="Error: "+e.message}};
+}
+
+/* ---------- self manifest + cross-site API ---------- */
+function selfManifest(){
+  const o=location.origin&&location.origin!=="null"?location.origin:"https://YOUR-USERNAME.github.io/agentmesh";
+  return{schema:"network.json/v1",id:"agentmesh",name:"AgentMesh",version:"1.0.0",description:"Browser-based discovery hub and orchestrator for the open agentic web. Scans sites, maps their tools and routes tasks across them.",url:o+"/",entry:o+"/",
+    runtime:{type:"browser",transport:["postMessage","https"],cors:"Access-Control-Allow-Origin: *"},
+    tools:[
+     {name:"scan_url",description:"Discover and load the .network.json manifest of a website.",tags:["discovery","manifest"],inputSchema:{type:"object",properties:{url:{type:"string",description:"Site URL"}},required:["url"]}},
+     {name:"list_agents",description:"List agents currently mapped in this AgentMesh session with their tools.",tags:["discovery","registry"],inputSchema:{type:"object",properties:{}}},
+     {name:"orchestrate",description:"Run a natural-language task across all mapped agents using the visitor’s own model key.",tags:["orchestration"],inputSchema:{type:"object",properties:{task:{type:"string"}},required:["task"]}}],
+    messaging:{request:{type:"agentmesh.call",fields:["id","tool","arguments"]},discover:{type:"agentmesh.discover"}}};
+}
+addEventListener("message",async e=>{
+  const d=e.data; if(!d||typeof d!=="object")return;
+  if(d.type==="agentmesh.discover")return e.source.postMessage({type:"agentmesh.manifest",manifest:selfManifest()},e.origin==="null"?"*":e.origin);
+  if(d.type!=="agentmesh.call")return;
+  const reply=o=>e.source.postMessage({id:d.id,...o},e.origin==="null"?"*":e.origin), a=d.arguments||{};
+  try{
+    if(d.tool==="scan_url"){await scan(a.url);reply({result:agents.map(x=>x.name)})}
+    else if(d.tool==="list_agents")reply({result:agents.map(x=>({name:x.name,base:x.base,tools:x.tools.map(t=>t.name)}))});
+    else if(d.tool==="orchestrate"){await orchestrate(a.task);reply({result:"done, see trace"})}
+    else reply({error:"Unknown tool"});
+  }catch(err){reply({error:err.message})}
+});
+function download(name,obj){const l=document.createElement("a");l.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}));l.download=name;l.click();URL.revokeObjectURL(l.href)}
+
+/* ---------- wiring ---------- */
+$("#scan").onclick=()=>scan($("#url").value);
+$("#url").onkeydown=e=>{if(e.key==="Enter")scan(e.target.value)};
+$("#demo").onclick=loadDemo;
+$("#reg").onclick=async()=>{try{const j=await(await fetch(API+"/api/registry")).json();j.agents.forEach(e=>addAgent(e.manifest,e.origin));trace(j.agents.length?`Loaded ${j.agents.length} agents from the community registry.`:"The registry is empty. Scan a site to add the first agent.","ok")}catch{trace("Backend not reachable. Start it with npm start.","er")}};
+$("#pasteBtn").onclick=()=>{$("#paste").open=true;$("#pj").focus()};
+$("#pjGo").onclick=()=>{try{const j=JSON.parse($("#pj").value);const b=j.url||j.entry||"manual://"+(j.name||"agent");const a=addAgent(j,b.replace(/\/$/,""));trace("Added "+a.name+" from pasted JSON.","ok")}catch(e){trace("Invalid JSON: "+e.message,"er")}};
+$("#run").onclick=async()=>{const t=$("#task").value.trim();if(!t)return trace("Describe a task first.","er");$("#run").disabled=true;try{await orchestrate(t)}catch(e){trace(e.message,"er")}$("#run").disabled=false};
+$("#selfExport").onclick=async()=>{let m=selfManifest();try{const r=await fetch(API+"/agent-manifest.json");if(r.ok)m=await r.json()}catch{}download("agent-manifest.json",m);setTimeout(()=>download(".network.json",m),300)};
+$("#prov").onchange=e=>{const[b,m]=e.target.value.split("|");if(b!=="custom"){$("#base").value=b;$("#model").value=m}$("#base").focus()};
+const SS=sessionStorage;
+["base","model","key"].forEach(k=>{if(SS.getItem("am_"+k)){$("#"+k).value=SS.getItem("am_"+k);$("#rem").checked=true}});
+$("#prov").dispatchEvent(new Event("change"));
+["base","model","key"].forEach(k=>$("#"+k).addEventListener("input",()=>{try{$("#rem").checked?SS.setItem("am_"+k,$("#"+k).value):SS.removeItem("am_"+k)}catch{}}));
+$("#rem").onchange=()=>["base","model","key"].forEach(k=>{try{$("#rem").checked?SS.setItem("am_"+k,$("#"+k).value):SS.removeItem("am_"+k)}catch{}});
+addEventListener("resize",()=>agents.length&&drawGraph());
+const q=new URLSearchParams(location.search).get("scan");if(q){$("#url").value=q;scan(q)}
+</script>
+</body>
+</html>
